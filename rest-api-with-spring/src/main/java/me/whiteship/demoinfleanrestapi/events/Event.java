@@ -12,6 +12,16 @@ import java.time.LocalDateTime;
 @Getter @Setter @EqualsAndHashCode(of = "id")
 @Entity
 public class Event {
+    // Event 자동 업데이트 강의 내용 추가 - 2023.04.09
+    public static EventBuilder builder(){
+        return new EventBuilder() {
+            public Event Builder() {
+                Event event = super.build();
+                event.update();
+                return event;
+            }
+        };
+    }
 
     @Id @GeneratedValue
     private Integer id;

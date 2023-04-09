@@ -1,5 +1,6 @@
 package me.whiteship.demoinfleanrestapi.events;
 
+import org.springframework.util.StringUtils;
 import me.whiteship.demoinfleanrestapi.accounts.Account;
 import me.whiteship.demoinfleanrestapi.accounts.CurrentUser;
 import me.whiteship.demoinfleanrestapi.common.ErrorsResource;
@@ -17,6 +18,8 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
 import java.net.URI;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
@@ -64,16 +67,54 @@ public class EventController {
         return ResponseEntity.created(createdUri).body(eventResource);
     }
 
+//    @GetMapping
+//    public ResponseEntity queryEvents(Pageable pageable,
+//                                      PagedResourcesAssembler<Event> assembler,
+//                                      @CurrentUser Account account) {
+//        Page<Event> page = this.eventRepository.findAll(pageable);
+//        var pagedResources = assembler.toModel(page, e -> new EventResource(e));
+//        pagedResources.add(new Link("/docs/index.html#resources-events-list").withRel("profile"));
+//        if (account != null) {
+//            pagedResources.add(linkTo(EventController.class).withRel("create-event"));
+//        }
+//        return ResponseEntity.ok(pagedResources);
+//    }
+
+    // TODO : 2023 상반기 강의 과제 2번째 제출
     @GetMapping
     public ResponseEntity queryEvents(Pageable pageable,
                                       PagedResourcesAssembler<Event> assembler,
-                                      @CurrentUser Account account) {
-        Page<Event> page = this.eventRepository.findAll(pageable);
+                                      @RequestParam(required = false) String name,
+                                      @RequestParam(required = false) Boolean basePriceFilter,
+                                      @RequestParam(required = false) Boolean closeEnrollmentDateTimeFilter) {
+
+        Page<Event> page = null;
+        Boolean nameValidate = StringUtils.hasText(name);
+        Boolean basePriceValidate = StringUtils.hasText(String.valueOf(basePriceFilter)) ? false : basePriceFilter;
+        Boolean closeEnrollmentDateTimeValidate = StringUtils.hasText(String.valueOf(closeEnrollmentDateTimeFilter))  ? false : closeEnrollmentDateTimeFilter;
+
+        if(nameValidate) {
+            page = this.eventRepository.findByNameContaining(name, pageable);
+        }
+
+        if(basePriceValidate){
+            int StartBasePrice = 100;
+            int endBasePrice = 200;
+            page = this.eventRepository.findByBasePriceBetween(StartBasePrice, endBasePrice, pageable);
+        }
+
+        if(closeEnrollmentDateTimeValidate){
+            Timestamp timestamp = Timestamp.valueOf(LocalDateTime.now());
+            page = this.eventRepository.findByCloseEnrollmentDateTimeAfter(timestamp ,pageable);
+        }
+
+        if(!nameValidate && !basePriceValidate && !closeEnrollmentDateTimeValidate){
+            page = this.eventRepository.findAll(pageable);
+        }
+
         var pagedResources = assembler.toModel(page, e -> new EventResource(e));
         pagedResources.add(new Link("/docs/index.html#resources-events-list").withRel("profile"));
-        if (account != null) {
-            pagedResources.add(linkTo(EventController.class).withRel("create-event"));
-        }
+
         return ResponseEntity.ok(pagedResources);
     }
 
@@ -119,6 +160,8 @@ public class EventController {
             return new ResponseEntity(HttpStatus.UNAUTHORIZED);
         }
 
+        // 강의 내용 추가
+        existingEvent.update();
         this.modelMapper.map(eventDto, existingEvent);
         Event savedEvent = this.eventRepository.save(existingEvent);
 
